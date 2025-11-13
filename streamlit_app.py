@@ -1,56 +1,78 @@
 import streamlit as st
 from openai import OpenAI
 
+import os
+
+from openai import OpenAI
+from openai.types.responses import ResponseOutputMessage
+
+def find_ticketmaster_events(input_text):
+  print("In find_ticketmaster_events")
+  client = OpenAI()
+
+  resp = client.responses.create(
+      model="gpt-4.1-mini",
+      tools=[
+          {
+              "type": "mcp",
+              "server_label": "weird-red-beetle",
+              "server_url": "https://weird-red-beetle.fastmcp.app/mcp",
+              "require_approval": "never",
+          },
+      ],
+      input=input_text,
+  )
+
+  user_texts = []
+  for item in resp.output:
+      if isinstance(item, ResponseOutputMessage):
+          for c in item.content:
+              if hasattr(c, "text"):
+                  user_texts.append(c.text)
+
+  # Join them for display
+  st.write("\n\n".join(user_texts))
+
+
+print("At the start")
+os.environ['OPENAI_API_KEY']=st.secrets['OPENAI_API_KEY']
+
+
+
 # Show title and description.
-st.title("💬 Chatbot")
+st.title("Smart Event Planner Chatbot")
 st.write(
     "This is a simple chatbot that uses OpenAI's GPT-3.5 model to generate responses. "
     "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
     "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
 )
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
+# Create a session state variable to store the chat messages. This ensures that the
+# messages persist across reruns.
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
+# Display the existing chat messages via `st.chat_message`.
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# Create a chat input field to allow the user to enter a message. This will display
+# automatically at the bottom of the page.
+user_city = st.text_input("Enter the city for music events:", key="city")
+user_timeline = st.text_input("Enter the month and year:", key="timeline")
+user_music_genre = st.text_input("Enter a genre (or 'none'):", key="genre")
+if user_city:
+    print(f"user city is {user_city}")
 
-    # Display the existing chat messages via `st.chat_message`.
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+if user_timeline:
+    print(f"user timeline is {user_timeline}")
+if user_music_genre:
+    print(f"user music genre is {user_music_genre}")
+tm_input = "Find music events in city " + user_city + " for genre " + user_music_genre + " for " + user_timeline
+print(f"user prompt is {tm_input}")
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
-
-        # Store and display the current prompt.
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
-        )
-
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
-        with st.chat_message("assistant"):
-            response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+if user_city and user_timeline and user_music_genre:
+    st.write("Initiating event search...")
+    find_ticketmaster_events(tm_input)
+    
